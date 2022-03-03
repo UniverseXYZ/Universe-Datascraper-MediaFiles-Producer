@@ -38,7 +38,7 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
    * #2. send to queue
    * #3. mark token as processed
    */
-  @Cron(CronExpression.EVERY_30_SECONDS)
+  @Cron(CronExpression.EVERY_5_SECONDS)
   public async checkCollection() {
     // Check if there is any unprocessed collection
     const unprocessed = await this.nftTokenService.findUnprocessedOne();
@@ -50,7 +50,10 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
     );
 
     // Prepare queue messages and sent as batch
-    const id = unprocessed.contractAddress + unprocessed.tokenId;
+    const id = `${unprocessed.contractAddress}-${unprocessed.tokenId.substring(
+      0,
+      30,
+    )}`;
     const mediaFiles: string[] = [];
     if (unprocessed.metadata?.image) {
       mediaFiles.push(unprocessed.metadata.image);
@@ -65,7 +68,7 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
         tokenId: unprocessed.tokenId,
         mediaFiles,
       },
-      groupId: unprocessed.contractAddress,
+      groupId: id,
       deduplicationId: id,
     };
     await this.sendMessage(message);
