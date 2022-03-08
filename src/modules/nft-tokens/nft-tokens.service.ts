@@ -20,10 +20,14 @@ export class NFTTokensService {
   }
 
   async findUnprocessedOne() {
-    return await this.nftTokensModel.findOne({
-      sentForMediaAt: null,
-      metadata: { $exists: true },
-    });
+    return await this.nftTokensModel.findOne(
+      {
+        sentForMediaAt: null,
+        metadata: { $exists: true },
+      },
+      {},
+      { sort: { priority: -1 } },
+    );
   }
 
   public async markAsProcessed(contractAddress: string, tokenId: string) {
