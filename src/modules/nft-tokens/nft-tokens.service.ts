@@ -19,14 +19,14 @@ export class NFTTokensService {
     );
   }
 
-  async findUnprocessedOne() {
-    return await this.nftTokensModel.findOne(
+  async findUnprocessed() {
+    return await this.nftTokensModel.find(
       {
         sentForMediaAt: null,
         metadata: { $exists: true },
       },
       {},
-      {},
+      {limit: 100},
     );
   }
 
