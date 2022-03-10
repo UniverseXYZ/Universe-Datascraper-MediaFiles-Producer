@@ -41,49 +41,54 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
   @Cron(CronExpression.EVERY_5_SECONDS)
   public async checkCollection() {
     // Check if there is any unprocessed collection
-    const unprocessed = await this.nftTokenService.findUnprocessedOne();
-    if (!unprocessed) {
+    const unprocessed = await this.nftTokenService.findUnprocessed();
+    if (!unprocessed || unprocessed.length === 0) {
       return;
     }
     this.logger.log(
-      `[Media Producer] Got one to process: ${unprocessed.contractAddress} - ${unprocessed.tokenId}`,
+      `[Media Producer] Got ${unprocessed.length} to process`,
     );
 
-    // Prepare queue messages and sent as batch
-    const id = `${unprocessed.contractAddress}-${unprocessed.tokenId.substring(
-      0,
-      30,
-    )}`;
-    const mediaFiles: string[] = [];
-    if (unprocessed.metadata?.image) {
-      mediaFiles.push(unprocessed.metadata.image);
-    }
-    if (unprocessed.metadata?.animation_url) {
-      mediaFiles.push(unprocessed.metadata.animation_url);
-    }
-    const message: Message<QueueMessageBody> = {
-      id,
-      body: {
-        contractAddress: unprocessed.contractAddress,
-        tokenId: unprocessed.tokenId,
-        mediaFiles,
-      },
-      groupId: id,
-      deduplicationId: id,
-    };
-    await this.sendMessage(message);
-    this.logger.log(
-      `[Media Producer] Successfully sent messages for token ${unprocessed.contractAddress} - ${unprocessed.tokenId}`,
-    );
+    for (const token of unprocessed) {
+      this.logger.log(
+        `[Media Producer] Got one to process: ${token.contractAddress} - ${token.tokenId}`,
+      );  
+      // Prepare queue messages and sent as batch
+      const id = `${token.contractAddress}-${token.tokenId.substring(
+        0,
+        30,
+      )}`;
+      const mediaFiles: string[] = [];
+      if (token.metadata?.image) {
+        mediaFiles.push(token.metadata.image);
+      }
+      if (token.metadata?.animation_url) {
+        mediaFiles.push(token.metadata.animation_url);
+      }
+      const message: Message<QueueMessageBody> = {
+        id,
+        body: {
+          contractAddress: token.contractAddress,
+          tokenId: token.tokenId,
+          mediaFiles,
+        },
+        groupId: id,
+        deduplicationId: id,
+      };
+      await this.sendMessage(message);
+      this.logger.log(
+        `[Media Producer] Successfully sent messages for token ${token.contractAddress} - ${token.tokenId}`,
+      );
 
-    // Mark this token
-    await this.nftTokenService.markAsProcessed(
-      unprocessed.contractAddress,
-      unprocessed.tokenId,
-    );
-    this.logger.log(
-      `[Media Producer] Successfully processed token ${unprocessed.contractAddress} - ${unprocessed.tokenId}`,
-    );
+      // Mark this token
+      await this.nftTokenService.markAsProcessed(
+        token.contractAddress,
+        token.tokenId,
+      );
+      this.logger.log(
+        `[Media Producer] Successfully processed token ${token.contractAddress} - ${token.tokenId}`,
+      );
+    }
   }
 
   async sendMessage<T = any>(payload: Message<T> | Message<T>[]) {
