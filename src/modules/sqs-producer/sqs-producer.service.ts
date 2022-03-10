@@ -38,7 +38,7 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
    * #2. send to queue
    * #3. mark token as processed
    */
-  @Cron(CronExpression.EVERY_5_SECONDS)
+  @Cron(CronExpression.EVERY_10_SECONDS)
   public async checkCollection() {
     // Check if there is any unprocessed collection
     const unprocessed = await this.nftTokenService.findUnprocessed();
