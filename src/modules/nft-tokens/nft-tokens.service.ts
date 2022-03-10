@@ -26,7 +26,7 @@ export class NFTTokensService {
         metadata: { $exists: true },
       },
       {},
-      { sort: { priority: -1 } },
+      {},
     );
   }
 
