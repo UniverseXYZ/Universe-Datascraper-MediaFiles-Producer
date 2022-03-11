@@ -75,7 +75,7 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
         groupId: id,
         deduplicationId: id,
       };
-      try{
+      try {
         await this.sendMessage(message);
       } catch (e) {
         this.logger.err(
