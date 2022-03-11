@@ -78,7 +78,7 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
       try {
         await this.sendMessage(message);
       } catch (e) {
-        this.logger.err(
+        this.logger.error(
           `[Media Producer] Error processing ${token.contractAddress} - ${token.tokenId}: ${e}`
         )
       }
