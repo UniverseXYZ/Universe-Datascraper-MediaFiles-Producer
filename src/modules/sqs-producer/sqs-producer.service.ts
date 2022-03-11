@@ -75,7 +75,13 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
         groupId: id,
         deduplicationId: id,
       };
-      await this.sendMessage(message);
+      try {
+        await this.sendMessage(message);
+      } catch (e) {
+        this.logger.err(
+          `[Media Producer] Error processing ${token.contractAddress} - ${token.tokenId}: ${e}`
+        )
+      }
       // this.logger.log(
       //   `[Media Producer] Successfully sent messages for token ${token.contractAddress} - ${token.tokenId}`,
       // );
