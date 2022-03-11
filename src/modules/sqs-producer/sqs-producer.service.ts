@@ -38,7 +38,7 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
    * #2. send to queue
    * #3. mark token as processed
    */
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron(CronExpression.EVERY_5_SECONDS)
   public async checkCollection() {
     // Check if there is any unprocessed collection
     const unprocessed = await this.nftTokenService.findUnprocessed();
@@ -50,9 +50,9 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
     );
 
     for (const token of unprocessed) {
-      this.logger.log(
-        `[Media Producer] Got one to process: ${token.contractAddress} - ${token.tokenId}`,
-      );  
+      // this.logger.log(
+      //   `[Media Producer] Got one to process: ${token.contractAddress} - ${token.tokenId}`,
+      // );  
       // Prepare queue messages and sent as batch
       const id = `${token.contractAddress}-${token.tokenId.substring(
         0,
@@ -76,19 +76,22 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
         deduplicationId: id,
       };
       await this.sendMessage(message);
-      this.logger.log(
-        `[Media Producer] Successfully sent messages for token ${token.contractAddress} - ${token.tokenId}`,
-      );
+      // this.logger.log(
+      //   `[Media Producer] Successfully sent messages for token ${token.contractAddress} - ${token.tokenId}`,
+      // );
 
       // Mark this token
       await this.nftTokenService.markAsProcessed(
         token.contractAddress,
         token.tokenId,
       );
-      this.logger.log(
-        `[Media Producer] Successfully processed token ${token.contractAddress} - ${token.tokenId}`,
-      );
+      // this.logger.log(
+      //   `[Media Producer] Successfully processed token ${token.contractAddress} - ${token.tokenId}`,
+      // );
     }
+    this.logger.log(
+      `[Media Producer] Completed producing batch`,
+    );
   }
 
   async sendMessage<T = any>(payload: Message<T> | Message<T>[]) {
