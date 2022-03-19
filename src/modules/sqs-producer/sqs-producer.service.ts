@@ -77,15 +77,15 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
       };
       try {
         await this.sendMessage(message);
-        await this.nftTokenService.markAsProcessed(
-          token.contractAddress,
-          token.tokenId,
-        );    
       } catch (e) {
         this.logger.error(
           `[Media Producer] Error processing ${token.contractAddress} - ${token.tokenId}: ${e}`
         )
       }
+      await this.nftTokenService.markAsProcessed(
+          token.contractAddress,
+          token.tokenId,
+      );
     }
     this.logger.log(
       `[Media Producer] Completed producing batch`,
