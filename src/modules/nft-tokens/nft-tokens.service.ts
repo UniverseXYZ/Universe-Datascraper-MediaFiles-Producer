@@ -26,7 +26,7 @@ export class NFTTokensService {
         metadata: { $exists: true },
       },
       {},
-      {limit: 50},
+      {limit: 100},
     );
   }
 
