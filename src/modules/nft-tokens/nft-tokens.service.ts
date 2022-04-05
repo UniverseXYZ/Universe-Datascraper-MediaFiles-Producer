@@ -39,4 +39,20 @@ export class NFTTokensService {
       },
     );
   }
+
+  public async markAsProcessedBatch(tokens: NFTToken[]) {
+    await this.nftTokensModel.bulkWrite(
+      tokens.map((x) => ({
+        updateOne: {
+          filter: {
+            contractAddress: x.contractAddress,
+            tokenId: x.tokenId,
+          },
+          update: { sentAt: new Date() },
+          upsert: false,
+        },
+      })),
+    );
+  }
+
 }
