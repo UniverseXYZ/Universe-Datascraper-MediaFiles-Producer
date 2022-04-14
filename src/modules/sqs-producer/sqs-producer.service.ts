@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Producer } from 'sqs-producer';
 import AWS from 'aws-sdk';
+import SqsExtendedClient from 'sqs-extended-client';
 import {
   Message,
   QueueMessageBody,
@@ -28,9 +29,19 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
   }
 
   public onModuleInit() {
+
+    const bucketName = this.configService.get('aws.sqsS3Bucket');
+        
+    this.logger.log(`Initializing SQS Extended Client w/ S3 bucket '${bucketName}'`);
+    const sqs: SqsExtendedClient = new SqsExtendedClient(
+      new AWS.SQS(),
+      new AWS.S3(),
+      { bucketName }
+    );
+
     this.sqsProducer = Producer.create({
       queueUrl: this.configService.get('aws.queueUrl'),
-      sqs: new AWS.SQS(),
+      sqs,
     });
     this.source = this.configService.get('source');
   }
