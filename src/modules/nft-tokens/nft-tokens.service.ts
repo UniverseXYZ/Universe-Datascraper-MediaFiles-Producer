@@ -48,7 +48,7 @@ export class NFTTokensService {
             contractAddress: x.contractAddress,
             tokenId: x.tokenId,
           },
-          update: { sentAt: new Date() },
+          update: { sentForMediaAt: new Date() },
           upsert: false,
         },
       })),
