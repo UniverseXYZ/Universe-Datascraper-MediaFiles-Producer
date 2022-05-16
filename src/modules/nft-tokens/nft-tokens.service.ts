@@ -42,11 +42,11 @@ export class NFTTokensService {
 
   public async markAsProcessedBatch(tokens: NFTToken[]) {
     await this.nftTokensModel.bulkWrite(
-      tokens.map((x) => ({
+      tokens.map(token => ({
         updateOne: {
           filter: {
-            contractAddress: x.contractAddress,
-            tokenId: x.tokenId,
+            contractAddress: token.contractAddress,
+            tokenId: token.tokenId,
           },
           update: { sentForMediaAt: new Date() },
           upsert: false,
