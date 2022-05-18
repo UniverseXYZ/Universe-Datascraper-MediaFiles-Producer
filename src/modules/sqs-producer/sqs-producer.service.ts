@@ -15,7 +15,7 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
   public sqsProducer: Producer;
   public source: string;
   private readonly logger = new Logger(SqsProducerService.name);
-
+  private queryingUnprocessed: boolean;
   constructor(
     private configService: ConfigService,
     private readonly nftTokenService: NFTTokensService,
@@ -25,6 +25,7 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
       accessKeyId: this.configService.get('aws.accessKeyId'),
       secretAccessKey: this.configService.get('aws.secretAccessKey'),
     });
+    this.queryingUnprocessed = false;
   }
 
   public onModuleInit() {
@@ -42,9 +43,17 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
    */
   @Cron(CronExpression.EVERY_10_SECONDS)
   public async checkCollection() {
+    try {
     // Check if there is any unprocessed collection
+    if (this.queryingUnprocessed) {
+      return;
+    }
+
+    this.queryingUnprocessed = true;
+
     const unprocessed = await this.nftTokenService.findUnprocessed(this.source);
     if (!unprocessed || unprocessed.length === 0) {
+      this.queryingUnprocessed = false;
       return;
     }
     this.logger.log(
@@ -89,9 +98,19 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
           token.tokenId,
       );
     }
+
+    this.queryingUnprocessed = false;
     this.logger.log(
       `[Media Producer] Completed producing batch`,
     );
+    } catch(err) {
+      this.queryingUnprocessed = false;
+      this.logger.error(
+        `[Media Producer] Encountered unexpected error during processing:`
+      )
+      this.logger.error(err);
+    }
+
   }
 
   async sendMessage<T = any>(payload: Message<T> | Message<T>[]) {
