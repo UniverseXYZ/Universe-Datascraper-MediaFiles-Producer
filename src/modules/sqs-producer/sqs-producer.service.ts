@@ -51,6 +51,9 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
       `[Media Producer] Got ${unprocessed.length} to process`,
     );
 
+    // Tokens we've successfully processed
+    const processedTokens = [];
+
     for (const token of unprocessed) {
       // this.logger.log(
       //   `[Media Producer] Got one to process: ${token.contractAddress} - ${token.tokenId}`,
@@ -78,20 +81,27 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
         deduplicationId: id,
       };
       try {
-        await this.sendMessage(message);
+        await this.sendMessage(message);        
       } catch (e) {
         this.logger.error(
-          `[Media Producer] Error processing ${token.contractAddress} - ${token.tokenId}: ${e}`
+          `[Media Producer] Error processing token ${token.contractAddress} - ${token.tokenId}: ${e}`
         )
       }
-      await this.nftTokenService.markAsProcessed(
-          token.contractAddress,
-          token.tokenId,
-      );
+
+      // Per Ryan, we'll mark as processed even if there's a failure writing the message to
+      // the queue. This means we don't really *need* the processedTokens var but I'm keeping
+      // it to convey intent, and should we opt to change that functionality this just needs
+      // to be moved inside the above 'try' after the sendMessage call
+      processedTokens.push(token);
     }
-    this.logger.log(
-      `[Media Producer] Completed producing batch`,
-    );
+
+    if(0 < processedTokens.length) {
+      await this.nftTokenService.markAsProcessedBatch(processedTokens);
+      this.logger.log(`[Media Producer] Successfully marked ${processedTokens.length} tokens as processed`);
+    }
+    else {
+      this.logger.log('[Media Producer] No tokens were processed');
+    }
   }
 
   async sendMessage<T = any>(payload: Message<T> | Message<T>[]) {
