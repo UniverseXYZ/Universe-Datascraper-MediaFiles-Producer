@@ -33,7 +33,7 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
     const bucketName = this.configService.get('aws.sqsS3Bucket');
         
     this.logger.log(`Initializing SQS Extended Client w/ S3 bucket '${bucketName}'`);
-    const sqs: SqsExtendedClient = new SqsExtendedClient(
+    const sqsExtendedClient: SqsExtendedClient = new SqsExtendedClient(
       new AWS.SQS(),
       new AWS.S3(),
       { bucketName }
@@ -41,7 +41,7 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
 
     this.sqsProducer = Producer.create({
       queueUrl: this.configService.get('aws.queueUrl'),
-      sqs,
+      sqs: sqsExtendedClient,
     });
     this.source = this.configService.get('source');
   }
