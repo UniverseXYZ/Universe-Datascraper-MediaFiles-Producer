@@ -47,6 +47,7 @@
     "rimraf": "^3.0.2",
     "rxjs": "^7.5.2",
     "sqs-consumer": "^5.6.0",
+    "sqs-extended-client": "^0.1.0",
     "sqs-producer": "^2.1.0",
     "swagger-ui-express": "^4.3.0",
     "ts-singleton": "^1.0.2"
