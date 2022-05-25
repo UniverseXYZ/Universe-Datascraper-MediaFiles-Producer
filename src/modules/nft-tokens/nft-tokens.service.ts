@@ -11,6 +11,13 @@ export class NFTTokensService {
     private readonly nftTokensModel: Model<NFTTokensDocument>,
   ) {}
 
+  private static getProcessedUpdate(): any {
+    return {
+      sentForMediaAt: new Date(),
+      needToRefreshMediaFiles: false,
+    }
+  }
+
   async updateOne(nftToken: NFTTokensDTO) {
     const { contractAddress, tokenId, ...res } = nftToken;
     await this.nftTokensModel.updateOne(
@@ -23,7 +30,7 @@ export class NFTTokensService {
     return await this.nftTokensModel.find(
       {
         sentForMediaAt: null,
-        metadata: { $exists: true },
+        needToRefreshMediaFiles: true,
         source: source,
       },
       {},
@@ -34,9 +41,7 @@ export class NFTTokensService {
   public async markAsProcessed(contractAddress: string, tokenId: string) {
     await this.nftTokensModel.updateOne(
       { contractAddress, tokenId },
-      {
-        sentForMediaAt: new Date(),
-      },
+      NFTTokensService.getProcessedUpdate(),
     );
   }
 
@@ -48,7 +53,7 @@ export class NFTTokensService {
             contractAddress: token.contractAddress,
             tokenId: token.tokenId,
           },
-          update: { sentForMediaAt: new Date() },
+          update: NFTTokensService.getProcessedUpdate(),
           upsert: false,
         },
       })),
