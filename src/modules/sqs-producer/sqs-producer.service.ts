@@ -9,13 +9,16 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { NFTTokensService } from '../nft-tokens/nft-tokens.service';
+import { Utils } from 'src/utils';
 
 @Injectable()
 export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
   public sqsProducer: Producer;
   public source: string;
   private readonly logger = new Logger(SqsProducerService.name);
-
+  private isProcessing: boolean = false;
+  private skippingCounter: number = 0;
+  
   constructor(
     private configService: ConfigService,
     private readonly nftTokenService: NFTTokensService,
@@ -42,9 +45,36 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
    */
   @Cron(CronExpression.EVERY_10_SECONDS)
   public async checkCollection() {
+    if (this.isProcessing) {
+      if (
+        this.skippingCounter <
+        Number(this.configService.get('skippingCounterLimit'))
+      ) {
+        this.skippingCounter++;
+        this.logger.log(
+          `[CRON MediaFiles Task] Task is in process, skipping (${this.skippingCounter}) ...`,
+        );
+      } else {
+        // when the counter reaches the limit, restart the pod.
+        this.logger.log(
+          `[CRON MediaFiles Task] Task skipping counter reached its limit. The process is not responsive, restarting...`,
+        );
+        Utils.shutdown();
+      }
+
+      return;
+    }
+
+    this.logger.log(
+      `[CRON MediaFiles Task] Starting to process`,
+    );
+
+    this.isProcessing = true;
+
     // Check if there is any unprocessed collection
     const unprocessed = await this.nftTokenService.findUnprocessed(this.source);
     if (!unprocessed || unprocessed.length === 0) {
+      this.isProcessing = false;   
       return;
     }
     this.logger.log(
@@ -95,13 +125,16 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
       processedTokens.push(token);
     }
 
-    if(0 < processedTokens.length) {
+    if (0 < processedTokens.length) {
       await this.nftTokenService.markAsProcessedBatch(processedTokens);
       this.logger.log(`[Media Producer] Successfully marked ${processedTokens.length} tokens as processed`);
     }
     else {
       this.logger.log('[Media Producer] No tokens were processed');
     }
+
+    this.isProcessing = false;
+    this.skippingCounter = 0;
   }
 
   async sendMessage<T = any>(payload: Message<T> | Message<T>[]) {
