@@ -19,7 +19,7 @@ export class NFTTokensService {
     );
   }
 
-  async findUnprocessed(source: string) {
+  async findUnprocessed(source: string, limit: number) {
     return await this.nftTokensModel.find(
       {
         sentForMediaAt: null,
@@ -27,7 +27,7 @@ export class NFTTokensService {
         source: source,
       },
       {},
-      {limit: 100},
+      {limit},
     );
   }
 

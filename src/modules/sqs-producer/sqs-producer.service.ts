@@ -15,6 +15,7 @@ import { Utils } from 'src/utils';
 export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
   public sqsProducer: Producer;
   public source: string;
+  public queryLimit: number;
   private readonly logger = new Logger(SqsProducerService.name);
   private isProcessing: boolean = false;
   private skippingCounter: number = 0;
@@ -36,6 +37,7 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
       sqs: new AWS.SQS(),
     });
     this.source = this.configService.get('source');
+    this.queryLimit = this.configService.get('query_limit') || 100
   }
 
   /**
@@ -72,7 +74,7 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
     this.isProcessing = true;
 
     // Check if there is any unprocessed collection
-    const unprocessed = await this.nftTokenService.findUnprocessed(this.source);
+    const unprocessed = await this.nftTokenService.findUnprocessed(this.source, this.queryLimit);
     if (!unprocessed || unprocessed.length === 0) {
       this.isProcessing = false;   
       return;
