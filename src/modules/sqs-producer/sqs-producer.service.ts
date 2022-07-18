@@ -76,7 +76,8 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
     // Check if there is any unprocessed collection
     const unprocessed = await this.nftTokenService.findUnprocessed(this.source, this.queryLimit);
     if (!unprocessed || unprocessed.length === 0) {
-      this.isProcessing = false;   
+      this.isProcessing = false;
+      this.skippingCounter = 0;
       return;
     }
     this.logger.log(
