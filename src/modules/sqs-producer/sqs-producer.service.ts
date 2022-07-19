@@ -72,68 +72,73 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
     );
 
     this.isProcessing = true;
-
-    // Check if there is any unprocessed collection
-    const unprocessed = await this.nftTokenService.findUnprocessed(this.source, this.queryLimit);
-    if (!unprocessed || unprocessed.length === 0) {
-      this.isProcessing = false;
-      this.skippingCounter = 0;
-      return;
-    }
-    this.logger.log(
-      `[Media Producer] Got ${unprocessed.length} to process`,
-    );
-
-    // Tokens we've successfully processed
-    const processedTokens = [];
-
-    for (const token of unprocessed) {
-      // this.logger.log(
-      //   `[Media Producer] Got one to process: ${token.contractAddress} - ${token.tokenId}`,
-      // );  
-      // Prepare queue messages and sent as batch
-      const id = `${token.contractAddress}-${token.tokenId.substring(
-        0,
-        30,
-      )}`;
-      const mediaFiles: string[] = [];
-      if (token.metadata?.image) {
-        mediaFiles.push(token.metadata.image);
+    try {
+      // Check if there is any unprocessed collection
+      const unprocessed = await this.nftTokenService.findUnprocessed(this.source, this.queryLimit);
+      if (!unprocessed || unprocessed.length === 0) {
+        this.isProcessing = false;
+        this.skippingCounter = 0;
+        return;
       }
-      if (token.metadata?.animation_url) {
-        mediaFiles.push(token.metadata.animation_url);
-      }
-      const message: Message<QueueMessageBody> = {
-        id,
-        body: {
-          contractAddress: token.contractAddress,
-          tokenId: token.tokenId,
-          mediaFiles,
-        },
-        groupId: id,
-        deduplicationId: id,
-      };
-      try {
-        await this.sendMessage(message);        
-      } catch (e) {
-        this.logger.error(
-          `[Media Producer] Error processing token ${token.contractAddress} - ${token.tokenId}: ${e}`
-        )
+      this.logger.log(
+        `[Media Producer] Got ${unprocessed.length} to process`,
+      );
+
+      // Tokens we've successfully processed
+      const processedTokens = [];
+
+      for (const token of unprocessed) {
+        // this.logger.log(
+        //   `[Media Producer] Got one to process: ${token.contractAddress} - ${token.tokenId}`,
+        // );  
+        // Prepare queue messages and sent as batch
+        const id = `${token.contractAddress}-${token.tokenId.substring(
+          0,
+          30,
+        )}`;
+        const mediaFiles: string[] = [];
+        if (token.metadata?.image) {
+          mediaFiles.push(token.metadata.image);
+        }
+        if (token.metadata?.animation_url) {
+          mediaFiles.push(token.metadata.animation_url);
+        }
+        const message: Message<QueueMessageBody> = {
+          id,
+          body: {
+            contractAddress: token.contractAddress,
+            tokenId: token.tokenId,
+            mediaFiles,
+          },
+          groupId: id,
+          deduplicationId: id,
+        };
+        try {
+          await this.sendMessage(message);        
+        } catch (e) {
+          this.logger.error(
+            `[Media Producer] Error processing token ${token.contractAddress} - ${token.tokenId}: ${e}`
+          )
+        }
+
+        // Per Ryan, we'll mark as processed even if there's a failure writing the message to
+        // the queue. This means we don't really *need* the processedTokens var but I'm keeping
+        // it to convey intent, and should we opt to change that functionality this just needs
+        // to be moved inside the above 'try' after the sendMessage call
+        processedTokens.push(token);
       }
 
-      // Per Ryan, we'll mark as processed even if there's a failure writing the message to
-      // the queue. This means we don't really *need* the processedTokens var but I'm keeping
-      // it to convey intent, and should we opt to change that functionality this just needs
-      // to be moved inside the above 'try' after the sendMessage call
-      processedTokens.push(token);
-    }
+      if (0 < processedTokens.length) {
+        await this.nftTokenService.markAsProcessedBatch(processedTokens);
+        this.logger.log(`[Media Producer] Successfully marked ${processedTokens.length} tokens as processed`);
+      }
+      else {
+        this.logger.log('[Media Producer] No tokens were processed');
+      }
 
-    if (0 < processedTokens.length) {
-      await this.nftTokenService.markAsProcessedBatch(processedTokens);
-      this.logger.log(`[Media Producer] Successfully marked ${processedTokens.length} tokens as processed`);
-    }
-    else {
-      this.logger.log('[Media Producer] No tokens were processed');
+    } catch(err) {
+      this.logger.error("Unexpected error during processing:");
+      this.logger.error(err);
     }
 
     this.isProcessing = false;
