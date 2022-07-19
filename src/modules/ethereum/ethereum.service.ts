@@ -1,29 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EthereumNetworkType } from './interface';
 import { ethers } from 'ethers';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class EthereumService {
-  public ether: ethers.providers.FallbackProvider;
+  public ether: ethers.providers.StaticJsonRpcProvider;
+  
+  private definedProviders: ethers.providers.StaticJsonRpcProvider[];
+  private providerIndex: number = 0;
+
   private readonly logger = new Logger(EthereumService.name);
 
   constructor(private configService: ConfigService) {
-    const network: ethers.providers.Networkish =
-      this.configService.get('ethereum_network');
-    const quorum = Number(this.configService.get('ethereum_quorum'));
+    const network: ethers.providers.Networkish = this.configService.get('ethereum_network');
+    
+    const infuraSecret: string = this.configService.get('infura.project_secret');
+    const infuraId: string = this.configService.get('infura.project_id');
 
-    const projectSecret: string = this.configService.get(
-      'infura.project_secret',
-    );
-    const projectId: string = this.configService.get('infura.project_id');
-    const infuraProvider: ethers.providers.InfuraProvider =
-      projectId && projectSecret
-        ? new ethers.providers.InfuraProvider(network, {
-            projectId: projectId,
-            projectSecret: projectSecret,
-          })
-        : undefined;
+    const infuraProvider: ethers.providers.InfuraProvider = infuraId && infuraSecret ? 
+      new ethers.providers.InfuraProvider(network, {projectId: infuraId, projectSecret: infuraSecret}) 
+      : undefined;
 
     const alchemyToken: string = this.configService.get('alchemy_token');
     const alchemyProvider: ethers.providers.AlchemyProvider = alchemyToken
@@ -31,46 +27,80 @@ export class EthereumService {
       : undefined;
 
     const chainstackUrl: string = this.configService.get('chainstack_url');
-    const chainStackProvider: ethers.providers.JsonRpcProvider = chainstackUrl
-      ? new ethers.providers.JsonRpcProvider(chainstackUrl, network)
+    const chainStackProvider: ethers.providers.StaticJsonRpcProvider = chainstackUrl
+      ? new ethers.providers.StaticJsonRpcProvider(chainstackUrl, network)
       : undefined;
 
     const quicknodeUrl: string = this.configService.get('quicknode_url');
-    const quicknodeProvider: ethers.providers.JsonRpcProvider = quicknodeUrl
-      ? new ethers.providers.JsonRpcProvider(quicknodeUrl, network)
+    const quicknodeProvider: ethers.providers.StaticJsonRpcProvider = quicknodeUrl
+      ? new ethers.providers.StaticJsonRpcProvider(quicknodeUrl, network)
       : undefined;
 
     if (
-      !quorum ||
-      (!infuraProvider &&
-        !alchemyProvider &&
-        !chainStackProvider &&
-        !quicknodeProvider)
+      !infuraProvider &&
+      !alchemyProvider &&
+      !chainStackProvider &&
+      !quicknodeProvider
     ) {
       throw new Error(
         'Quorum or Infura project id or secret or alchemy token or chainstack url is not defined',
       );
     }
 
-    const allProviders: ethers.providers.BaseProvider[] = [
+    const allProviders: ethers.providers.StaticJsonRpcProvider[] = [
       infuraProvider,
       alchemyProvider,
       chainStackProvider,
       quicknodeProvider,
     ];
-    const definedProviders: ethers.providers.BaseProvider[] =
+
+    const definedProviders: ethers.providers.StaticJsonRpcProvider[] =
       allProviders.filter((x) => x !== undefined);
 
-    const ethersProvider: ethers.providers.FallbackProvider =
-      new ethers.providers.FallbackProvider(definedProviders, quorum);
-    this.ether = ethersProvider;
+    this.ether = infuraProvider;
+    this.definedProviders = definedProviders;
 
     this.logger.log(
-      `Starting service with ${definedProviders.length} out of ${allProviders.length} with defined quorum: ${quorum}`,
+      `Started ethers service with ${definedProviders.length} out of ${allProviders.length} Providers. Starting with Infura.`,
     );
   }
 
   public async getBlockNum() {
-    return this.ether.getBlockNumber();
+    try {
+      if (this.providerIndex === 0) {
+        throw new Error();
+      }
+      return this.ether.getBlockNumber();
+    } catch(err) {
+      this.logger.log("Failed to get block number.")
+      return this.switchProvider(() => this.getBlockNum());
+    }
+  }
+
+  private async switchProvider(callback: any) {
+    // Rotate providers
+    if (this.providerIndex === this.definedProviders.length - 1) {
+      this.providerIndex = 0;
+    } else {
+      this.providerIndex += 1;
+    }
+
+    this.ether = this.definedProviders[this.providerIndex];
+    switch (this.providerIndex) {
+      case 0:
+        this.logger.log("Switched to Infura provider.")
+        break;
+      case 1:
+        this.logger.log("Switched to Alchemy provider.")
+        break;
+      case 2:
+        this.logger.log("Switched to Chainstack provider.")
+        break;
+      case 3:
+        this.logger.log("Switched to Quicknode provider.")
+        break;        
+    }
+
+    return callback();
   }
 }
