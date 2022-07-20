@@ -1,13 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ethers } from 'ethers';
 import { ConfigService } from '@nestjs/config';
+import { Utils } from 'src/utils';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class EthereumService {
   public ether: ethers.providers.StaticJsonRpcProvider;
   
   private definedProviders: ethers.providers.StaticJsonRpcProvider[];
-  private providerIndex: number = 0;
+  private allProviders: ethers.providers.StaticJsonRpcProvider[];
+  private providerIndex: number = -1;
 
   private readonly logger = new Logger(EthereumService.name);
 
@@ -50,57 +53,88 @@ export class EthereumService {
     const allProviders: ethers.providers.StaticJsonRpcProvider[] = [
       infuraProvider,
       alchemyProvider,
-      chainStackProvider,
       quicknodeProvider,
+      chainStackProvider,
     ];
 
     const definedProviders: ethers.providers.StaticJsonRpcProvider[] =
       allProviders.filter((x) => x !== undefined);
 
-    this.ether = infuraProvider;
     this.definedProviders = definedProviders;
+    this.allProviders = allProviders;
 
-    this.logger.log(
-      `Started ethers service with ${definedProviders.length} out of ${allProviders.length} Providers. Starting with Infura.`,
-    );
+    this.connectToProvider();
+  }
+
+  /**
+   * Try to start using the first provider
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  public async resetProviderIndex() {
+    this.providerIndex = -1;
+    await this.connectToProvider();
+  }
+  
+  /**
+   * Rotate through every defined provider and try to connect to one of them. If none are availabe service will stop execution
+   * @param callback Function to execute if successfully connected to provider
+   * @returns result of callback
+   */
+  public async connectToProvider(callback?: any) {
+    this.ether = null;
+    this.logger.warn("Initiating provider rotation logic! Beep boop...");
+
+    // Start from the current index provider and go through all of them
+    for (let i = this.providerIndex + 1; i < this.definedProviders.length + this.providerIndex + 1; i++) {
+      try {
+        const provider = this.definedProviders[i % this.definedProviders.length];
+        const currentBlockNumber = await provider.getBlockNumber();
+        if (isNaN(currentBlockNumber)) {
+          continue;
+        }
+
+        this.ether = provider;
+        this.providerIndex = i % this.definedProviders.length;
+
+        this.logger.log(`Connected to ${this.getProviderName()} provider. Block number: ${currentBlockNumber}. Configured ${this.definedProviders.length} out of ${this.allProviders.length} Providers`)
+        break;
+
+      } catch(err) {
+        this.logger.warn(`${this.getProviderName()} isn't available... Trying to connect to another one.`)
+      }
+    }
+
+    if (!this.ether) {
+      this.logger.warn("Couldn't find working provider. Stopping execution of microservice.");
+      Utils.shutdown();
+    }
+
+    if (callback) {
+      return callback();
+    }
   }
 
   public async getBlockNum() {
     try {
-      if (this.providerIndex === 0) {
-        throw new Error();
-      }
       return this.ether.getBlockNumber();
     } catch(err) {
-      this.logger.log("Failed to get block number.")
-      return this.switchProvider(() => this.getBlockNum());
+      this.logger.warn("Failed to get block number.")
+      return this.connectToProvider(() => this.getBlockNum());
     }
   }
 
-  private async switchProvider(callback: any) {
-    // Rotate providers
-    if (this.providerIndex === this.definedProviders.length - 1) {
-      this.providerIndex = 0;
-    } else {
-      this.providerIndex += 1;
-    }
-
-    this.ether = this.definedProviders[this.providerIndex];
+  private getProviderName() {
     switch (this.providerIndex) {
       case 0:
-        this.logger.log("Switched to Infura provider.")
-        break;
+        return "Infura";
       case 1:
-        this.logger.log("Switched to Alchemy provider.")
-        break;
+        return "Alchemy";
       case 2:
-        this.logger.log("Switched to Chainstack provider.")
-        break;
-      case 3:
-        this.logger.log("Switched to Quicknode provider.")
-        break;        
+        return "Quicknode";
+        case 3:
+        return "Chainstack";
+      default:
+        return "Unknown provider";
     }
-
-    return callback();
   }
 }
