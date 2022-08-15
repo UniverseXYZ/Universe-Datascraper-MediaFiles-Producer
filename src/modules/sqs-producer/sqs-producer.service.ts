@@ -100,6 +100,9 @@ export class SqsProducerService implements OnModuleInit, SqsProducerHandler {
         if (token.metadata?.image) {
           mediaFiles.push(token.metadata.image);
         }
+        if (token.metadata?.image_url) {
+          mediaFiles.push(token.metadata.image);
+        }
         if (token.metadata?.animation_url) {
           mediaFiles.push(token.metadata.animation_url);
         }
